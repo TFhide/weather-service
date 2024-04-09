@@ -1,0 +1,3 @@
+spring.application.name: WeatherService
+server:
+  port: 8080
