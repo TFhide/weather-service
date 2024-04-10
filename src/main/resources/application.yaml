@@ -9,15 +9,27 @@ external:
     weather:
       baseUrl: https://api.weather.yandex.ru
       apiVersion: /v2
-      endpoint: /fact
+      endpoint: /forecast
+      apiKeyHeader:
       apiKey:
+      lang: ru_RU
+      limit: 1
+      hours: true
+      extra: false
   weather.api:
       baseUrl: https://api.weatherapi.com
       apiVersion: /v1
       endpoint: /forecast.json
+      apiKeyHeader:
       apiKey:
+      lang: ru
+      days: 1
   weather.bit:
       baseUrl: https://api.weatherbit.io/
       apiVersion: /v2.0
       endpoint: /forecast/hourly
+      apiKeyHeader:
       apiKey:
+      lang: ru
+      hours: 24
+      units: m

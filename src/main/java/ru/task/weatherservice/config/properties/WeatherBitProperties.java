@@ -1,6 +1,7 @@
 package ru.task.weatherservice.config.properties;
 
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
@@ -14,6 +15,13 @@ public record WeatherBitProperties(
         @NotNull
         String endpoint,
         @NotNull
-        String apiKey
+        String apiKeyHeader,
+        @NotNull
+        String apiKey,
+        String lang,
+        @NotNull
+        @Positive
+        int hours,
+        String units
 ) {
 }
