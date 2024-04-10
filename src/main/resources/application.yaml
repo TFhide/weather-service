@@ -1,3 +1,23 @@
 spring.application.name: WeatherService
 server:
   port: 8080
+
+weather:
+  provider:
+external:
+  yandex:
+    weather:
+      baseUrl: https://api.weather.yandex.ru
+      apiVersion: /v2
+      endpoint: /fact
+      apiKey:
+  weather.api:
+      baseUrl: https://api.weatherapi.com
+      apiVersion: /v1
+      endpoint: /forecast.json
+      apiKey:
+  weather.bit:
+      baseUrl: https://api.weatherbit.io/
+      apiVersion: /v2.0
+      endpoint: /forecast/hourly
+      apiKey:

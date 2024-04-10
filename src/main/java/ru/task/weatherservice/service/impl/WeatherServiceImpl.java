@@ -17,5 +17,5 @@ public class WeatherServiceImpl implements WeatherService {
     public List<String> getWeeklyForecast(String city) {
         return null;
     }
-    dsad
+
 }
