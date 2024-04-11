@@ -3,7 +3,7 @@ server:
   port: 8080
 
 weather:
-  provider: yandex # или all, weatherapi, weatherbit
+  provider: weatherbit # all, yandex, weatherapi, weatherbit
 external:
   yandex:
     weather:
