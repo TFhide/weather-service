@@ -23,7 +23,7 @@ public class WeatherController {
     }
 
     @GetMapping("/current")
-    public ResponseEntity<String> getCurrentWeather(@RequestParam(defaultValue = "Krasnodar") String city) {
+    public ResponseEntity<List<String>> getCurrentWeather(@RequestParam(defaultValue = "Krasnodar") String city) {
         return ResponseEntity.ok().body(weatherService.getCurrentDayForecast(city));
     }
 

@@ -3,7 +3,7 @@ server:
   port: 8080
 
 weather:
-  provider:
+  provider: yandex # или all, weatherapi, weatherbit
 external:
   yandex:
     weather:
@@ -33,3 +33,7 @@ external:
       lang: ru
       hours: 24
       units: m
+  openmap:
+    street:
+        baseUrl: https://nominatim.openstreetmap.org
+        endpoint: /search

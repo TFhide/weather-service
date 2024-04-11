@@ -6,7 +6,7 @@ import java.util.List;
 
 @Service
 public interface WeatherService {
-    String getCurrentDayForecast(String city);
+    List<String> getCurrentDayForecast(String city);
 
     List<String> getWeeklyForecast(String city);
 }

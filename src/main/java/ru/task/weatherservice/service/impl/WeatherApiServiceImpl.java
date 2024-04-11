@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.util.UriComponentsBuilder;
 import ru.task.weatherservice.config.properties.WeatherApiProperties;
 import ru.task.weatherservice.exception.ExternalWeatherServiceException;
+import ru.task.weatherservice.model.Coordinate;
 import ru.task.weatherservice.model.dto.WeatherApiResponseDTO;
 import ru.task.weatherservice.service.ExternalWeatherService;
 
@@ -17,15 +18,16 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.concurrent.CompletableFuture;
 
 @Service
-@ConditionalOnProperty(name = "weather.provider", havingValue = "weatherapi")
-public class WeatherApiServiceImpl implements ExternalWeatherService<WeatherApiResponseDTO> {
+//@ConditionalOnProperty(name = "weather.provider", havingValue = "weatherapi")
+public class WeatherApiServiceImpl implements ExternalWeatherService {
 
     private final WeatherApiProperties properties;
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
-    private static final Logger LOGGER = LoggerFactory.getLogger(YandexWeatherServiceImpl.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(WeatherApiServiceImpl.class);
 
     @Autowired
     public WeatherApiServiceImpl(WeatherApiProperties properties, HttpClient httpClient, ObjectMapper objectMapper) {
@@ -35,45 +37,53 @@ public class WeatherApiServiceImpl implements ExternalWeatherService<WeatherApiR
     }
 
     @Override
-    public WeatherApiResponseDTO getCurrentDayForecastUsingExternalService(String city) {
-            URI uri = UriComponentsBuilder.fromUriString(properties.baseUrl())
-                    .replacePath(properties.apiVersion())
-                    .path(properties.endpoint())
-                    .queryParam("q", city)
-                    .queryParam("lang", properties.lang())
-                    .queryParam("days", properties.days())
-                    .build().toUri();
+    public CompletableFuture<String> getCurrentDayForecastUsingExternalService(Coordinate coordinate) {
+        return CompletableFuture.supplyAsync(() -> {
+                URI uri = UriComponentsBuilder.fromUriString(properties.baseUrl())
+                        .replacePath(properties.apiVersion())
+                        .path(properties.endpoint())
+                        .queryParam("q", coordinate.latitude() + "," + coordinate.longitude())
+                        .queryParam("lang", properties.lang())
+                        .queryParam("days", properties.days())
+                        .build().toUri();
 
-            return getYandexWeatherResponseDTO(uri);
+                return getYandexWeatherResponseDTO(uri);
+        }).exceptionally(e -> {
+            LOGGER.error("Error occurred while getting current day forecast", e);
+            return "";
+        });
     }
 
     @Override
-    public WeatherApiResponseDTO getWeeklyForecastUsingExternalService(String city) {
+    public CompletableFuture<String> getWeeklyForecastUsingExternalService(Coordinate coordinate) {
+        return CompletableFuture.supplyAsync(() -> {
             URI uri = UriComponentsBuilder.fromUriString(properties.baseUrl())
                     .replacePath(properties.apiVersion())
                     .path(properties.endpoint())
-                    .queryParam("q", city)
+                    .queryParam("q", coordinate.latitude() + "," + coordinate.longitude())
                     .queryParam("days", properties.days() + 6)
                     .queryParam("lang", properties.lang())
                     .build().toUri();
             return getYandexWeatherResponseDTO(uri);
+        }).exceptionally(e -> {
+            LOGGER.error("Error occurred while getting weekly forecast", e);
+            return "";
+        });
     }
 
-    private WeatherApiResponseDTO getYandexWeatherResponseDTO(URI uri) {
+    private String getYandexWeatherResponseDTO(URI uri) {
         HttpRequest request = HttpRequest.newBuilder().GET().uri(uri)
                 .header(properties.apiKeyHeader(), properties.apiKey()).build();
-        LOGGER.info("Sending request to {}", uri.toString());
+        LOGGER.info("Sending request to {}", uri);
 
         HttpResponse<String> response;
         try {
             response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            WeatherApiResponseDTO yandexWeatherResponseDTO =
-                    objectMapper.readValue(response.body(), WeatherApiResponseDTO.class);
-            return yandexWeatherResponseDTO;
-        }
-        catch (JsonProcessingException e) {
+            WeatherApiResponseDTO dto = objectMapper.readValue(response.body(), WeatherApiResponseDTO.class);
+            return objectMapper.writeValueAsString(dto);
+        } catch (JsonProcessingException e) {
             LOGGER.error("Error occurred while processing response from {}", uri, e);
-            throw new ExternalWeatherServiceException("Error occurred while processing weather data");
+            throw new ExternalWeatherServiceException("Error occurred while processing response");
         } catch (Exception e) {
             LOGGER.error("Error occurred while sending request to {}", uri, e);
             throw new ExternalWeatherServiceException("Error occurred due request process");
