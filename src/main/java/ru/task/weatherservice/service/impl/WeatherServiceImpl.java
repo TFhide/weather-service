@@ -3,6 +3,7 @@ package ru.task.weatherservice.service.impl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import ru.task.weatherservice.model.Coordinate;
@@ -18,7 +19,7 @@ import java.util.stream.Stream;
 @Service
 public class WeatherServiceImpl implements WeatherService {
 
-    private final List<ExternalWeatherService> externalWeatherServices;
+    private List<ExternalWeatherService> externalWeatherServices;
     private final ExternalGeoService externalGeoService;
     @Value("${weather.provider}")
     private String provider;
@@ -28,6 +29,10 @@ public class WeatherServiceImpl implements WeatherService {
     public WeatherServiceImpl(List<ExternalWeatherService> externalWeatherServices, ExternalGeoService externalGeoService) {
         this.externalWeatherServices = externalWeatherServices;
         this.externalGeoService = externalGeoService;
+    }
+
+    public void setExternalWeatherServices(List<ExternalWeatherService> externalWeatherServices) {
+        this.externalWeatherServices = externalWeatherServices;
     }
 
     @Override
@@ -68,13 +73,5 @@ public class WeatherServiceImpl implements WeatherService {
                         }).join())
                         .toList())
                 .join();
-
-//        CompletableFuture<Void> allResults =
-//                CompletableFuture.allOf(futureList.toArray(CompletableFuture[]::new));
-//
-//        return allResults.thenApply(unused -> futureList.stream()
-//                        .map(CompletableFuture::join)
-//                        .toList())
-//                .join();
     }
 }

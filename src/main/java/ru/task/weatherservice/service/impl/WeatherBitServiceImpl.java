@@ -14,7 +14,6 @@ import ru.task.weatherservice.model.Coordinate;
 import ru.task.weatherservice.model.dto.WeatherBitResponseDTO;
 import ru.task.weatherservice.service.ExternalWeatherService;
 
-import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -71,49 +70,19 @@ public class WeatherBitServiceImpl implements ExternalWeatherService {
     }
 
     private CompletableFuture<String> getWeatherBitResponseDTO(URI uri) {
-        LOGGER.info("Sending request to {}", uri);
-
         return httpClient.sendAsync(HttpRequest.newBuilder().uri(uri).GET().build(), HttpResponse.BodyHandlers.ofString())
                 .handle((response, e) -> {
-                    String str;
+                    if (e != null) {
+                        LOGGER.error("Error occurred sending request.", e);
+                        return "Error occurred sending request.";
+                    }
                     try {
                         WeatherBitResponseDTO dto = objectMapper.readValue(response.body(), WeatherBitResponseDTO.class);
-                        str = objectMapper.writeValueAsString(dto);
+                        return dto.toString();
                     } catch (JsonProcessingException ex) {
-                        throw new RuntimeException(ex);
+                        LOGGER.error("Error processing the response", ex);
+                        throw new ExternalWeatherServiceException("Error processing the response", ex);
                     }
-                    if (e != null) {
-                        LOGGER.error("Error occurred while sending request to " + uri, e);
-                        throw new ExternalWeatherServiceException("Error occurred while sending request to " + uri, e);
-                    }
-                    return str;
                 });
-//                .thenApply(response -> {
-//                    try {
-//                        WeatherBitResponseDTO dto = objectMapper.readValue(response.body(), WeatherBitResponseDTO.class);
-//                        return objectMapper.writeValueAsString(dto);
-//                    } catch (JsonProcessingException e) {
-//                        LOGGER.error("Error processing the response from WeatherBit", e);
-//                        throw new RuntimeException("Error processing the response", e);
-//                    }
-//                }).exceptionally(e -> {
-//                    LOGGER.error("Error occurred while getting forecast from WeatherBit", e);
-//                    return "Error occurred: " + e.getMessage();
-//                });
     }
 }
-//        CompletableFuture<HttpResponse<String>> future;
-//        try {
-//            future = httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString()).handle((response, e) -> {
-//                if (e != null) {
-//                    LOGGER.error("Error occurred while sending request to " + uri, e);
-//                    throw new ExternalWeatherServiceException("Error occurred while sending request to " + uri, e);
-//                }
-//                return response;
-//            });
-//            HttpResponse<String> response = future.join();
-//            WeatherBitResponseDTO dto = objectMapper.readValue(response.body(), WeatherBitResponseDTO.class);
-//            return objectMapper.writeValueAsString(dto);
-//        } catch (IOException e) {
-//            throw new RuntimeException("Error occurred while sending request to " + uri, e);
-//        }

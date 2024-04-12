@@ -1,13 +1,16 @@
 package ru.task.weatherservice.service.impl;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.web.util.UriComponentsBuilder;
 import ru.task.weatherservice.config.properties.NominatimOpenStreetMapProperties;
+import ru.task.weatherservice.exception.ExternalGeoServiceException;
 import ru.task.weatherservice.model.Coordinate;
 import ru.task.weatherservice.service.ExternalGeoService;
 
@@ -20,6 +23,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 @Service
+@Qualifier("nominatim")
 public class NominatimOpenStreetMapServiceImpl implements ExternalGeoService {
 
     private final NominatimOpenStreetMapProperties properties;
@@ -36,30 +40,31 @@ public class NominatimOpenStreetMapServiceImpl implements ExternalGeoService {
 
     @Override
     public CompletableFuture<Optional<Coordinate>> searchCoordinates(String city) {
-        LOGGER.info("Searching coordinates for city: {}", city);
-        return CompletableFuture.supplyAsync((() -> {
         URI uri = UriComponentsBuilder.fromUriString(properties.baseUrl())
                 .queryParam("format", "json")
                 .queryParam("q", city)
                 .build().toUri();
+
+        return getResponseOfCoordinates(uri);
+    }
+
+    private CompletableFuture<Optional<Coordinate>> getResponseOfCoordinates(URI uri) {
         HttpRequest request = HttpRequest.newBuilder().GET().uri(uri).build();
 
-        HttpResponse<String> response;
-        try {
-            response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            List<Coordinate> coordinates = objectMapper.readValue(response.body(), new TypeReference<>() {
-            });
-            Optional<Coordinate> firstCoordinate = coordinates.stream().findFirst();
-            LOGGER.info("Found first coordinate {}", firstCoordinate);
-            return firstCoordinate;
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return Optional.empty();
-        } catch (Exception e) {
-            LOGGER.error("Error occurred while searching coordinates", e);
-            return Optional.empty();
-        }
-    }
-    ));
+        return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                .handle((response, e) -> {
+                    if (e != null) {
+                        LOGGER.error("Error occurred sending request.", e);
+                        return Optional.empty();
+                    }
+                    List<Coordinate> coordinates = null;
+                    try {
+                        coordinates = objectMapper.readValue(response.body(), new TypeReference<>() {
+                        });
+                        return coordinates.stream().findFirst();
+                    } catch (JsonProcessingException ex) {
+                        throw new ExternalGeoServiceException("Error occurred while parsing response", ex);
+                    }
+                });
     }
 }

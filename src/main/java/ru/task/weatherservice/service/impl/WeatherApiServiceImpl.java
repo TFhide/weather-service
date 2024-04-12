@@ -22,7 +22,7 @@ import java.util.concurrent.CompletableFuture;
 
 @Service
 @Qualifier("weatherapi")
-public class WeatherApiServiceImpl  {
+public class WeatherApiServiceImpl implements ExternalWeatherService {
 
     private final WeatherApiProperties properties;
     private final HttpClient httpClient;
@@ -35,58 +35,45 @@ public class WeatherApiServiceImpl  {
         this.httpClient = httpClient;
         this.objectMapper = objectMapper;
     }
-//
-//    @Override
-//    public CompletableFuture<String> getCurrentDayForecastUsingExternalService(Coordinate coordinate) {
-//        return CompletableFuture.supplyAsync(() -> {
-//                URI uri = UriComponentsBuilder.fromUriString(properties.baseUrl())
-//                        .replacePath(properties.apiVersion())
-//                        .path(properties.endpoint())
-//                        .queryParam("q", coordinate.latitude() + "," + coordinate.longitude())
-//                        .queryParam("lang", properties.lang())
-//                        .queryParam("days", properties.days())
-//                        .build().toUri();
-//
-//                return getWeatherApiResponseDTO(uri);
-//        }).exceptionally(e -> {
-//            LOGGER.error("Error occurred while getting current day forecast", e);
-//            return "";
-//        });
-//    }
-//
-//    @Override
-//    public CompletableFuture<String> getWeeklyForecastUsingExternalService(Coordinate coordinate) {
-//        return CompletableFuture.supplyAsync(() -> {
-//            URI uri = UriComponentsBuilder.fromUriString(properties.baseUrl())
-//                    .replacePath(properties.apiVersion())
-//                    .path(properties.endpoint())
-//                    .queryParam("q", coordinate.latitude() + "," + coordinate.longitude())
-//                    .queryParam("days", properties.days() + 6)
-//                    .queryParam("lang", properties.lang())
-//                    .build().toUri();
-//            return getWeatherApiResponseDTO(uri);
-//        }).exceptionally(e -> {
-//            LOGGER.error("Error occurred while getting weekly forecast", e);
-//            return "";
-//        });
-//    }
-//
-//    private String getWeatherApiResponseDTO(URI uri) {
-//        HttpRequest request = HttpRequest.newBuilder().GET().uri(uri)
-//                .header(properties.apiKeyHeader(), properties.apiKey()).build();
-//        LOGGER.info("Sending request to {}", uri);
-//
-//        HttpResponse<String> response;
-//        try {
-//            response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-//            WeatherApiResponseDTO dto = objectMapper.readValue(response.body(), WeatherApiResponseDTO.class);
-//            return objectMapper.writeValueAsString(dto);
-//        } catch (JsonProcessingException e) {
-//            LOGGER.error("Error occurred while processing response from {}", uri, e);
-//            throw new ExternalWeatherServiceException("Error occurred while processing response");
-//        } catch (Exception e) {
-//            LOGGER.error("Error occurred while sending request to {}", uri, e);
-//            throw new ExternalWeatherServiceException("Error occurred due request process");
-//        }
-//    }
+
+    @Override
+    public CompletableFuture<String> getCurrentDayForecastUsingExternalService(Coordinate coordinate) {
+                URI uri = UriComponentsBuilder.fromUriString(properties.baseUrl())
+                        .replacePath(properties.apiVersion())
+                        .path(properties.endpoint())
+                        .queryParam("q", coordinate.latitude() + "," + coordinate.longitude())
+                        .queryParam("lang", properties.lang())
+                        .queryParam("days", properties.days())
+                        .build().toUri();
+
+                return getWeatherApiResponseDTO(uri);
+    }
+
+    @Override
+    public CompletableFuture<String> getWeeklyForecastUsingExternalService(Coordinate coordinate) {
+            URI uri = UriComponentsBuilder.fromUriString(properties.baseUrl())
+                    .replacePath(properties.apiVersion())
+                    .path(properties.endpoint())
+                    .queryParam("q", coordinate.latitude() + "," + coordinate.longitude())
+                    .queryParam("days", properties.days() + 6)
+                    .queryParam("lang", properties.lang())
+                    .build().toUri();
+
+            return getWeatherApiResponseDTO(uri);
+    }
+
+    private CompletableFuture<String> getWeatherApiResponseDTO(URI uri) {
+        return httpClient.sendAsync(HttpRequest.newBuilder().uri(uri).GET()
+                        .header(properties.apiKeyHeader(), properties.apiKey()).build(), HttpResponse.BodyHandlers.ofString())
+                .handle((response, e) -> {
+                    try {
+                        WeatherApiResponseDTO dto =
+                                objectMapper.readValue(response.body(), WeatherApiResponseDTO.class);
+                        return dto.toString();
+                    } catch (JsonProcessingException ex) {
+                        LOGGER.error("Error processing the response", ex);
+                        throw new ExternalWeatherServiceException("Error processing the response", ex);
+                    }
+                });
+    }
 }
