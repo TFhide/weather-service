@@ -10,7 +10,6 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.web.util.UriComponentsBuilder;
 import ru.task.weatherservice.config.properties.NominatimOpenStreetMapProperties;
-import ru.task.weatherservice.exception.ExternalGeoServiceException;
 import ru.task.weatherservice.model.Coordinate;
 import ru.task.weatherservice.service.ExternalGeoService;
 
@@ -29,10 +28,12 @@ public class NominatimOpenStreetMapServiceImpl implements ExternalGeoService {
     private final NominatimOpenStreetMapProperties properties;
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
-    private static final Logger LOGGER = LoggerFactory.getLogger(NominatimOpenStreetMapServiceImpl.class);
+    private static final Logger LOGGER =
+            LoggerFactory.getLogger(NominatimOpenStreetMapServiceImpl.class);
 
     @Autowired
-    public NominatimOpenStreetMapServiceImpl(NominatimOpenStreetMapProperties properties, HttpClient httpClient, ObjectMapper objectMapper) {
+    public NominatimOpenStreetMapServiceImpl(NominatimOpenStreetMapProperties properties,
+                                             HttpClient httpClient, ObjectMapper objectMapper) {
         this.properties = properties;
         this.httpClient = httpClient;
         this.objectMapper = objectMapper;
@@ -40,31 +41,33 @@ public class NominatimOpenStreetMapServiceImpl implements ExternalGeoService {
 
     @Override
     public CompletableFuture<Optional<Coordinate>> searchCoordinates(String city) {
-        URI uri = UriComponentsBuilder.fromUriString(properties.baseUrl())
-                .queryParam("format", "json")
-                .queryParam("q", city)
-                .build().toUri();
-
-        return getResponseOfCoordinates(uri);
+            return getResponseOfCoordinates(getUri(city));
     }
 
     private CompletableFuture<Optional<Coordinate>> getResponseOfCoordinates(URI uri) {
         HttpRequest request = HttpRequest.newBuilder().GET().uri(uri).build();
 
         return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
-                .handle((response, e) -> {
-                    if (e != null) {
-                        LOGGER.error("Error occurred sending request.", e);
-                        return Optional.empty();
-                    }
-                    List<Coordinate> coordinates = null;
+                .thenApply(response -> {
                     try {
-                        coordinates = objectMapper.readValue(response.body(), new TypeReference<>() {
-                        });
+                        List<Coordinate> coordinates = objectMapper.readValue(response.body(),
+                                new TypeReference<>() {});
+                        LOGGER.info("Successfully found coordinates: {}", coordinates.stream().findFirst());
                         return coordinates.stream().findFirst();
-                    } catch (JsonProcessingException ex) {
-                        throw new ExternalGeoServiceException("Error occurred while parsing response", ex);
+                    } catch (JsonProcessingException e) {
+                        LOGGER.error("Error while parsing response", e);
+                        return Optional.<Coordinate>empty();
                     }
+                }).exceptionally(ex -> {
+                    LOGGER.error("Error occurred sending request.", ex);
+                    return Optional.empty();
                 });
+    }
+
+    private URI getUri(String city) {
+        return UriComponentsBuilder.fromUriString(properties.baseUrl())
+                .queryParam("format", "json")
+                .queryParam("q", city)
+                .build().toUri();
     }
 }

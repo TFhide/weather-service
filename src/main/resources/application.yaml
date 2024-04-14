@@ -3,7 +3,7 @@ server:
   port: 8080
 
 weather:
-  provider: weatherbit # all, yandex, weatherapi, weatherbit
+  provider: yandex # all, yandex, weatherapi, weatherbit
 external:
   yandex:
     weather:
@@ -14,6 +14,7 @@ external:
       apiKey:
       lang: ru_RU
       limit: 1
+      week: 7
       hours: true
       extra: false
   weather.api:
@@ -24,6 +25,7 @@ external:
       apiKey:
       lang: ru
       days: 1
+      week: 7
   weather.bit:
       baseUrl: https://api.weatherbit.io/
       apiVersion: /v2.0
@@ -32,6 +34,7 @@ external:
       apiKey:
       lang: ru
       hours: 24
+      week: 168
       units: m
   openmap:
     street:

@@ -2,11 +2,10 @@ package ru.task.weatherservice.service;
 
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 public interface WeatherService {
-    List<String> getCurrentDayForecast(String city);
+    CompletableFuture<List<String>> getCurrentDayForecast(String city);
 
-    List<String> getWeeklyForecast(String city);
-
-    void setExternalWeatherServices(List<ExternalWeatherService> mockedServices);
+    CompletableFuture<List<String>> getWeeklyForecast(String city);
 }

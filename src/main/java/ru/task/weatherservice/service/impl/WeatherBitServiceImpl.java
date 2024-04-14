@@ -9,10 +9,11 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.web.util.UriComponentsBuilder;
 import ru.task.weatherservice.config.properties.WeatherBitProperties;
-import ru.task.weatherservice.exception.ExternalWeatherServiceException;
+import ru.task.weatherservice.model.ApiResponse;
 import ru.task.weatherservice.model.Coordinate;
 import ru.task.weatherservice.model.dto.WeatherBitResponseDTO;
 import ru.task.weatherservice.service.ExternalWeatherService;
+import utils.HttpStatusHandler;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -24,13 +25,15 @@ import java.util.concurrent.CompletableFuture;
 @Qualifier("weatherbit")
 public class WeatherBitServiceImpl implements ExternalWeatherService {
 
+    public static final String SERVICE_NAME = "WeatherBit";
     private final WeatherBitProperties properties;
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
     private static final Logger LOGGER = LoggerFactory.getLogger(WeatherBitServiceImpl.class);
 
     @Autowired
-    public WeatherBitServiceImpl(WeatherBitProperties properties, HttpClient httpClient, ObjectMapper objectMapper) {
+    public WeatherBitServiceImpl(WeatherBitProperties properties, HttpClient httpClient,
+                                 ObjectMapper objectMapper) {
         this.properties = properties;
         this.httpClient = httpClient;
         this.objectMapper = objectMapper;
@@ -38,51 +41,47 @@ public class WeatherBitServiceImpl implements ExternalWeatherService {
 
     @Override
     public CompletableFuture<String> getCurrentDayForecastUsingExternalService(Coordinate coordinate) {
-            URI uri = UriComponentsBuilder.fromUriString(properties.baseUrl())
-                    .replacePath(properties.apiVersion())
-                    .path(properties.endpoint())
-                    .queryParam(properties.apiKeyHeader(), properties.apiKey())
-                    .queryParam("lat", coordinate.latitude())
-                    .queryParam("lon", coordinate.longitude())
-                    .queryParam("lang", properties.lang())
-                    .queryParam("hours", properties.hours())
-                    .queryParam("units", properties.units())
-                    .build().toUri();
-
-            return getWeatherBitResponseDTO(uri);
+            return getWeatherBitResponseDTO(getUri(coordinate, properties.hours()));
         }
-
 
     @Override
     public CompletableFuture<String> getWeeklyForecastUsingExternalService(Coordinate coordinate) {
-            URI uri = UriComponentsBuilder.fromUriString(properties.baseUrl())
-                    .replacePath(properties.apiVersion())
-                    .path(properties.endpoint())
-                    .queryParam(properties.apiKeyHeader(), properties.apiKey())
-                    .queryParam("lat", coordinate.latitude())
-                    .queryParam("lon", coordinate.longitude())
-                    .queryParam("lang", properties.lang())
-                    .queryParam("hours", properties.hours() + 144)
-                    .queryParam("units", properties.units())
-                    .build().toUri();
-
-            return getWeatherBitResponseDTO(uri);
+            return getWeatherBitResponseDTO(getUri(coordinate, properties.week()));
     }
 
     private CompletableFuture<String> getWeatherBitResponseDTO(URI uri) {
-        return httpClient.sendAsync(HttpRequest.newBuilder().uri(uri).GET().build(), HttpResponse.BodyHandlers.ofString())
-                .handle((response, e) -> {
-                    if (e != null) {
-                        LOGGER.error("Error occurred sending request.", e);
-                        return "Error occurred sending request.";
-                    }
+        return httpClient.sendAsync(HttpRequest.newBuilder().uri(uri).GET()
+                        .build(), HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> {
                     try {
-                        WeatherBitResponseDTO dto = objectMapper.readValue(response.body(), WeatherBitResponseDTO.class);
-                        return dto.toString();
+                        ApiResponse apiResponse = HttpStatusHandler.handleResponseStatus(SERVICE_NAME, response);
+                        if(!apiResponse.success()) {
+                            LOGGER.error("Error response: {}", apiResponse.message());
+                            return apiResponse.message();
+                        }
+                        String data =
+                                objectMapper.readValue(response.body(), WeatherBitResponseDTO.class).toString();
+                        return ApiResponse.ok(SERVICE_NAME, data).toString();
                     } catch (JsonProcessingException ex) {
-                        LOGGER.error("Error processing the response", ex);
-                        throw new ExternalWeatherServiceException("Error processing the response", ex);
+                        LOGGER.error("Error processing the response.", ex);
+                        return ApiResponse.error(SERVICE_NAME,"Error processing the response.").message();
                     }
+                }).exceptionally(ex -> {
+                    LOGGER.error("Error occurred sending request.", ex);
+                    return ApiResponse.error(SERVICE_NAME,"Error occurred sending request.").message();
                 });
+    }
+
+    private URI getUri(Coordinate coordinate, int hoursOrWeek) {
+        return UriComponentsBuilder.fromUriString(properties.baseUrl())
+                .replacePath(properties.apiVersion())
+                .path(properties.endpoint())
+                .queryParam(properties.apiKeyHeader(), properties.apiKey())
+                .queryParam("lat", coordinate.latitude())
+                .queryParam("lon", coordinate.longitude())
+                .queryParam("lang", properties.lang())
+                .queryParam("hours", hoursOrWeek)
+                .queryParam("units", properties.units())
+                .build().toUri();
     }
 }
