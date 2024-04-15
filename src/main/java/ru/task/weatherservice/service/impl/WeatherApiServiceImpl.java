@@ -5,78 +5,81 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.web.util.UriComponentsBuilder;
 import ru.task.weatherservice.config.properties.WeatherApiProperties;
-import ru.task.weatherservice.exception.ExternalWeatherServiceException;
+import ru.task.weatherservice.model.ApiResponse;
+import ru.task.weatherservice.model.Coordinate;
 import ru.task.weatherservice.model.dto.WeatherApiResponseDTO;
 import ru.task.weatherservice.service.ExternalWeatherService;
+import utils.HttpStatusHandler;
 
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.concurrent.CompletableFuture;
 
 @Service
-@ConditionalOnProperty(name = "weather.provider", havingValue = "weatherapi")
-public class WeatherApiServiceImpl implements ExternalWeatherService<WeatherApiResponseDTO> {
+@Qualifier("weatherapi")
+public class WeatherApiServiceImpl implements ExternalWeatherService {
 
+    public static final String SERVICE_NAME = "WeatherApi";
     private final WeatherApiProperties properties;
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
-    private static final Logger LOGGER = LoggerFactory.getLogger(YandexWeatherServiceImpl.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(WeatherApiServiceImpl.class);
 
     @Autowired
-    public WeatherApiServiceImpl(WeatherApiProperties properties, HttpClient httpClient, ObjectMapper objectMapper) {
+    public WeatherApiServiceImpl(WeatherApiProperties properties, HttpClient httpClient,
+                                 ObjectMapper objectMapper) {
         this.properties = properties;
         this.httpClient = httpClient;
         this.objectMapper = objectMapper;
     }
 
     @Override
-    public WeatherApiResponseDTO getCurrentDayForecastUsingExternalService(String city) {
-            URI uri = UriComponentsBuilder.fromUriString(properties.baseUrl())
-                    .replacePath(properties.apiVersion())
-                    .path(properties.endpoint())
-                    .queryParam("q", city)
-                    .queryParam("lang", properties.lang())
-                    .queryParam("days", properties.days())
-                    .build().toUri();
-
-            return getYandexWeatherResponseDTO(uri);
+    public CompletableFuture<String> getCurrentDayForecastUsingExternalService(Coordinate coordinate) {;
+        return getWeatherApiResponseDTO(getUri(coordinate, properties.days()));
     }
 
     @Override
-    public WeatherApiResponseDTO getWeeklyForecastUsingExternalService(String city) {
-            URI uri = UriComponentsBuilder.fromUriString(properties.baseUrl())
-                    .replacePath(properties.apiVersion())
-                    .path(properties.endpoint())
-                    .queryParam("q", city)
-                    .queryParam("days", properties.days() + 6)
-                    .queryParam("lang", properties.lang())
-                    .build().toUri();
-            return getYandexWeatherResponseDTO(uri);
+    public CompletableFuture<String> getWeeklyForecastUsingExternalService(Coordinate coordinate) {
+        return getWeatherApiResponseDTO(getUri(coordinate, properties.week()));
     }
 
-    private WeatherApiResponseDTO getYandexWeatherResponseDTO(URI uri) {
-        HttpRequest request = HttpRequest.newBuilder().GET().uri(uri)
-                .header(properties.apiKeyHeader(), properties.apiKey()).build();
-        LOGGER.info("Sending request to {}", uri.toString());
+    private CompletableFuture<String> getWeatherApiResponseDTO(URI uri) {
+        return httpClient.sendAsync(HttpRequest.newBuilder().uri(uri).GET()
+                        .header(properties.apiKeyHeader(), properties.apiKey())
+                        .build(), HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> {
+                    ApiResponse apiResponse = HttpStatusHandler.handleResponseStatus(SERVICE_NAME,response);
+                    if(!apiResponse.success()) {
+                        LOGGER.error("Error response: {}", apiResponse.message());
+                        return apiResponse.message();
+                    }
+                    try {
+                        String data =
+                                objectMapper.readValue(response.body(), WeatherApiResponseDTO.class).toString();
+                        return ApiResponse.ok(SERVICE_NAME,data).toString();
+                    } catch (JsonProcessingException ex) {
+                        LOGGER.error("Error processing the response.", ex);
+                        return ApiResponse.error(SERVICE_NAME,"Error processing the response.").message();
+                    }
+                }).exceptionally(ex -> {
+                    LOGGER.error("Error occurred sending request.", ex);
+                    return ApiResponse.error(SERVICE_NAME,"Error occurred sending request.").message();
+                });
+    }
 
-        HttpResponse<String> response;
-        try {
-            response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            WeatherApiResponseDTO yandexWeatherResponseDTO =
-                    objectMapper.readValue(response.body(), WeatherApiResponseDTO.class);
-            return yandexWeatherResponseDTO;
-        }
-        catch (JsonProcessingException e) {
-            LOGGER.error("Error occurred while processing response from {}", uri, e);
-            throw new ExternalWeatherServiceException("Error occurred while processing weather data");
-        } catch (Exception e) {
-            LOGGER.error("Error occurred while sending request to {}", uri, e);
-            throw new ExternalWeatherServiceException("Error occurred due request process");
-        }
+    private URI getUri(Coordinate coordinate, int daysOrWeek) {
+        return UriComponentsBuilder.fromUriString(properties.baseUrl())
+                .replacePath(properties.apiVersion())
+                .path(properties.endpoint())
+                .queryParam("q", coordinate.latitude() + "," + coordinate.longitude())
+                .queryParam("lang", properties.lang())
+                .queryParam("days", daysOrWeek)
+                .build().toUri();
     }
 }

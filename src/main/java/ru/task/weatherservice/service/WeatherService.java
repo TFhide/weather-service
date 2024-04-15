@@ -1,12 +1,11 @@
 package ru.task.weatherservice.service;
 
-import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
-@Service
 public interface WeatherService {
-    String getCurrentDayForecast(String city);
+    CompletableFuture<List<String>> getCurrentDayForecast(String city);
 
-    List<String> getWeeklyForecast(String city);
+    CompletableFuture<List<String>> getWeeklyForecast(String city);
 }

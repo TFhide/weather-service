@@ -1,48 +1,91 @@
 package ru.task.weatherservice.service.impl;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import ru.task.weatherservice.exception.WeatherServiceException;
+import ru.task.weatherservice.model.Coordinate;
+import ru.task.weatherservice.service.ExternalGeoService;
 import ru.task.weatherservice.service.ExternalWeatherService;
 import ru.task.weatherservice.service.WeatherService;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
+import java.util.stream.Stream;
 
 @Service
 public class WeatherServiceImpl implements WeatherService {
 
-    private final ExternalWeatherService externalWeatherService;
-    private final ObjectMapper objectMapper;
+    private final List<ExternalWeatherService> externalWeatherServices;
+    private final ExternalGeoService externalGeoService;
+    @Value("${weather.provider}")
+    private String provider;
+    private static final Logger LOGGER = LoggerFactory.getLogger(WeatherServiceImpl.class);
 
     @Autowired
-    public WeatherServiceImpl(ExternalWeatherService externalWeatherService, ObjectMapper objectMapper) {
-        this.externalWeatherService = externalWeatherService;
-        this.objectMapper = objectMapper;
+    public WeatherServiceImpl(List<ExternalWeatherService> externalWeatherServices,
+                              ExternalGeoService externalGeoService) {
+        this.externalWeatherServices = externalWeatherServices;
+        this.externalGeoService = externalGeoService;
     }
 
     @Override
-    public String getCurrentDayForecast(String city) {
-        try {
-            return objectMapper.writeValueAsString(externalWeatherService.getCurrentDayForecastUsingExternalService(city));
-        } catch (JsonProcessingException e) {
-            throw new WeatherServiceException("Error occurred while processing weather data");
-        } catch (Exception e) {
-            throw new WeatherServiceException("Failed to get weather from external service.", e);
-        }
+    public CompletableFuture<List<String>> getCurrentDayForecast(String city) {
+        CompletableFuture<Optional<Coordinate>> coordinateFuture =
+                externalGeoService.searchCoordinates(city);
+        return coordinateFuture.thenCompose(coordinateOpt -> {
+            if (coordinateOpt.isPresent()) {
+                Coordinate coordinate = coordinateOpt.get();
+                return getForecasts(service -> service.getCurrentDayForecastUsingExternalService(coordinate));
+            } else {
+                return CompletableFuture
+                        .completedFuture(Collections.singletonList("Coordinates not found for city: " + city));
+            }
+        });
     }
 
     @Override
-    public List<String> getWeeklyForecast(String city) {
-        try {
-            String json = objectMapper.writeValueAsString(externalWeatherService.getCurrentDayForecastUsingExternalService(city));
-            return List.of(json, json, json);
-        } catch (JsonProcessingException e) {
-            throw new WeatherServiceException("Error occurred while processing weather data");
-        } catch (Exception e) {
-            throw new WeatherServiceException("Failed to get weather from external service.", e);
-        }
+    public CompletableFuture<List<String>> getWeeklyForecast(String city) {
+        CompletableFuture<Optional<Coordinate>> coordinateFuture = externalGeoService.searchCoordinates(city);
+        return coordinateFuture.thenCompose(coordinateOpt -> {
+            if (coordinateOpt.isPresent()) {
+                Coordinate coordinate = coordinateOpt.get();
+                return getForecasts(service -> service.getWeeklyForecastUsingExternalService(coordinate));
+            } else {
+                return CompletableFuture
+                        .completedFuture(Collections.singletonList("Coordinates not found for city: " + city));
+            }
+        });
     }
 
+    private Stream<ExternalWeatherService> filterServicesByProvider(String provider,
+                                                                    Stream<ExternalWeatherService> servicesStream) {
+        return provider.equals("all") ? servicesStream :
+                servicesStream.filter(s -> s.getClass().getSimpleName().toLowerCase()
+                        .contains(provider.toLowerCase()));
+    }
+
+    private CompletableFuture<List<String>> getForecasts(Function<ExternalWeatherService,
+            CompletableFuture<String>> forecastFunction) {
+        List<CompletableFuture<String>> handledFutures = filterServicesByProvider(provider,
+                externalWeatherServices.stream())
+                .map(forecastFunction)
+                .map(future -> future.exceptionally(e -> {
+                    LOGGER.error("Error occurred sending request.", e);
+                    return "Error occurred sending request.";
+                })).toList();
+
+        return CompletableFuture.allOf(handledFutures.toArray(new CompletableFuture[0]))
+                .thenApply(v -> {
+                    List<String> forecasts = handledFutures.stream()
+                            .map(CompletableFuture::join)
+                            .toList();
+                    LOGGER.info("Successfully gathered all forecasts {}", forecasts);
+                    return forecasts;
+                });
+    }
 }

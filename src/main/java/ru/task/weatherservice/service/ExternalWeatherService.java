@@ -1,8 +1,13 @@
 package ru.task.weatherservice.service;
 
+import ru.task.weatherservice.model.Coordinate;
 
-public interface ExternalWeatherService<T> {
-    T getCurrentDayForecastUsingExternalService(String city);
+import java.util.concurrent.CompletableFuture;
 
-    T getWeeklyForecastUsingExternalService(String city);
+public interface ExternalWeatherService {
+
+    CompletableFuture<String> getCurrentDayForecastUsingExternalService(Coordinate coordinate);
+
+    CompletableFuture<String> getWeeklyForecastUsingExternalService(Coordinate coordinate);
+
 }

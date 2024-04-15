@@ -1,0 +1,2 @@
+weather:
+  provider: yandex # all, yandex, weatherapi, weatherbit

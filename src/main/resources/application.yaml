@@ -3,33 +3,40 @@ server:
   port: 8080
 
 weather:
-  provider:
+  provider: yandex # all, yandex, weatherapi, weatherbit
 external:
   yandex:
     weather:
       baseUrl: https://api.weather.yandex.ru
       apiVersion: /v2
       endpoint: /forecast
-      apiKeyHeader:
+      apiKeyHeader: X-Yandex-API-Key
       apiKey:
       lang: ru_RU
       limit: 1
+      week: 7
       hours: true
       extra: false
   weather.api:
       baseUrl: https://api.weatherapi.com
       apiVersion: /v1
       endpoint: /forecast.json
-      apiKeyHeader:
+      apiKeyHeader: key
       apiKey:
       lang: ru
       days: 1
+      week: 7
   weather.bit:
       baseUrl: https://api.weatherbit.io/
       apiVersion: /v2.0
       endpoint: /forecast/hourly
-      apiKeyHeader:
+      apiKeyHeader: key
       apiKey:
       lang: ru
       hours: 24
+      week: 168
       units: m
+  openmap:
+    street:
+        baseUrl: https://nominatim.openstreetmap.org
+        endpoint: /search
