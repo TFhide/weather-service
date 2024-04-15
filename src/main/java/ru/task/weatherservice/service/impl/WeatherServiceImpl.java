@@ -84,7 +84,7 @@ public class WeatherServiceImpl implements WeatherService {
                     List<String> forecasts = handledFutures.stream()
                             .map(CompletableFuture::join)
                             .toList();
-                    LOGGER.info("Successfully gathered all forecasts {}", forecasts); // Перемещено сюда
+                    LOGGER.info("Successfully gathered all forecasts {}", forecasts);
                     return forecasts;
                 });
     }

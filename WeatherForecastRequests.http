@@ -1,0 +1,13 @@
+### Погода на сегодня без указания города
+# Возвращает прогноз погоды на текущий день для города по умолчанию (Краснодар).
+GET http://localhost:8080/api/weather/current
+
+### Погода на сегодня c указанием городе
+GET http://localhost:8080/api/weather/current?city=Moscow
+
+### Погода на неделю без указания города
+# Возвращает прогноз погоды на неделю для города по умолчанию (Краснодар).
+GET http://localhost:8080/api/weather/weekly
+
+### Погода на неделю с указанием города
+GET http://localhost:8080/api/weather/weekly?city=Moscow

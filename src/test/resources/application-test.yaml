@@ -1,3 +1,2 @@
-# application-test.yaml
 weather:
-  provider: weatherbit # all, yandex, weatherapi, weatherbit
+  provider: yandex # all, yandex, weatherapi, weatherbit

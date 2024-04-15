@@ -33,11 +33,11 @@ public final class HttpStatusHandler {
                 default: {
                     if (status.is2xxSuccessful()) return ApiResponse.ok(serviceName,null);
                     else return ApiResponse.error(serviceName,"Unexpected response status: " + status
-                            + "Please contact support.");
+                            + " Please contact support.");
                 }
             }
         }
         return ApiResponse.error(serviceName,"Unknown response status: " + response.statusCode()
-                + "Unable to process the request.");
+                + " Unable to process the request.");
     }
 }
