@@ -40,7 +40,7 @@ public class WeatherApiServiceImpl implements ExternalWeatherService {
     }
 
     @Override
-    public CompletableFuture<String> getCurrentDayForecastUsingExternalService(Coordinate coordinate) {;
+    public CompletableFuture<String> getCurrentDayForecastUsingExternalService(Coordinate coordinate) {
         return getWeatherApiResponseDTO(getUri(coordinate, properties.days()));
     }
 
